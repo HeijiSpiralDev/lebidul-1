@@ -1,0 +1,73 @@
+[project]
+name = "lebidul"
+version = "0.1.0"
+description = "Site web Le Bidul - Agenda culturel Le Mans"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Django & Wagtail
+    "django>=5.1,<5.2",
+    "wagtail>=6.3,<7.0",
+    
+    # Base de données
+    "psycopg[binary]>=3.1",
+    
+    # API
+    "djangorestframework>=3.15",
+    "django-filter>=24.0",
+    
+    # Tags
+    "django-taggit>=6.0",
+    "django-modelcluster>=6.3",
+    
+    # Cache & Tasks
+    "redis>=5.0",
+    "celery>=5.4",
+    
+    # Utils
+    "python-dotenv>=1.0",
+    "pillow>=10.0",
+    "whitenoise>=6.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0",
+    "ruff>=0.6",
+    "isort>=5.13",
+    "pytest>=8.0",
+    "pytest-django>=4.8",
+    "coverage>=7.0",
+    "django-debug-toolbar>=4.4",
+    "watchfiles>=0.24",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+exclude = '''
+/(
+    \.git
+    | \.venv
+    | migrations
+    | __pycache__
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["migrations", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = ["migrations", ".venv"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "lebidul.settings.dev"
+python_files = ["test_*.py", "*_test.py"]
