@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block meta_description %}{{ page.introduction|truncatewords:25 }}{% endblock %}
+
+{% block body_class %}article-page{% endblock %}
+
+{% block content %}
+<article class="article">
+    <div class="container container--narrow">
+        {# En-tête de l'article #}
+        <header class="article__header">
+            {# Catégories #}
+            {% if page.categories.all %}
+            <div class="article__categories">
+                {% for cat in page.categories.all %}
+                <a href="/chroniques/?categorie={{ cat.slug }}" 
+                   class="category-tag" 
+                   style="background-color: {{ cat.couleur }};">
+                    {{ cat.nom }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <h1 class="article__title">{{ page.title }}</h1>
+            
+            {# Métadonnées #}
+            <div class="article__meta">
+                {% if page.auteur %}
+                <div class="article__author">
+                    {% if page.auteur.photo %}
+                        {% image page.auteur.photo fill-50x50 as author_photo %}
+                        <img src="{{ author_photo.url }}" alt="{{ page.auteur.nom }}" class="article__author-photo">
+                    {% endif %}
+                    <span>Par <a href="/chroniques/?auteur={{ page.auteur.slug }}">{{ page.auteur.nom }}</a></span>
+                </div>
+                {% endif %}
+                
+                <time class="article__date" datetime="{{ page.date_publication|date:'Y-m-d' }}">
+                    {{ page.date_publication|date:"d F Y" }}
+                </time>
+            </div>
+            
+            {# Introduction / Chapô #}
+            {% if page.introduction %}
+            <p class="article__intro">{{ page.introduction }}</p>
+            {% endif %}
+        </header>
+        
+        {# Image principale #}
+        {% if page.image_principale %}
+        <figure class="article__hero">
+            {% image page.image_principale width-900 as hero_img %}
+            <img src="{{ hero_img.url }}" alt="{{ page.title }}">
+        </figure>
+        {% endif %}
+        
+        {# Contenu de l'article #}
+        <div class="article__content prose">
+            {% for block in page.contenu %}
+                {% if block.block_type == 'texte' %}
+                    {{ block.value|richtext }}
+                {% elif block.block_type == 'image' %}
+                    <figure class="content-image">
+                        {% image block.value width-800 as content_img %}
+                        <img src="{{ content_img.url }}" alt="{{ block.value.title }}">
+                        {% if block.value.title %}
+                        <figcaption>{{ block.value.title }}</figcaption>
+                        {% endif %}
+                    </figure>
+                {% elif block.block_type == 'galerie' %}
+                    <div class="gallery">
+                        {% for img in block.value %}
+                            {% image img fill-300x300 as gallery_img %}
+                            <a href="{% image img width-1200 %}{{ img.url }}" class="gallery__item">
+                                <img src="{{ gallery_img.url }}" alt="{{ img.title }}">
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% elif block.block_type == 'citation' %}
+                    <blockquote class="quote">{{ block.value }}</blockquote>
+                {% elif block.block_type == 'embed' %}
+                    <div class="embed">{{ block.value }}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        
+        {# Tags #}
+        {% if page.tags.all %}
+        <footer class="article__footer">
+            <div class="article__tags">
+                <span>Tags :</span>
+                {% for tag in page.tags.all %}
+                <a href="/chroniques/?tag={{ tag.slug }}" class="tag">{{ tag.name }}</a>
+                {% endfor %}
+            </div>
+        </footer>
+        {% endif %}
+        
+        {# Bio de l'auteur #}
+        {% if page.auteur and page.auteur.bio %}
+        <aside class="author-box">
+            {% if page.auteur.photo %}
+                {% image page.auteur.photo fill-100x100 as author_large %}
+                <img src="{{ author_large.url }}" alt="{{ page.auteur.nom }}" class="author-box__photo">
+            {% endif %}
+            <div class="author-box__content">
+                <h3 class="author-box__name">{{ page.auteur.nom }}</h3>
+                <p class="author-box__bio">{{ page.auteur.bio }}</p>
+                <div class="author-box__links">
+                    {% if page.auteur.site_web %}
+                    <a href="{{ page.auteur.site_web }}" target="_blank" rel="noopener">Site web</a>
+                    {% endif %}
+                    {% if page.auteur.twitter %}
+                    <a href="https://twitter.com/{{ page.auteur.twitter }}" target="_blank" rel="noopener">Twitter</a>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+        {% endif %}
+        
+        {# Navigation #}
+        <nav class="article__nav">
+            {% if page.get_prev_sibling %}
+            <a href="{{ page.get_prev_sibling.url }}" class="article__nav-link article__nav-link--prev">
+                ← {{ page.get_prev_sibling.title|truncatewords:5 }}
+            </a>
+            {% endif %}
+            
+            {% if page.get_next_sibling %}
+            <a href="{{ page.get_next_sibling.url }}" class="article__nav-link article__nav-link--next">
+                {{ page.get_next_sibling.title|truncatewords:5 }} →
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</article>
+{% endblock %}

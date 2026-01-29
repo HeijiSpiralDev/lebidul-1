@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block meta_description %}Le Bidul n°{{ page.bidul.numero }} - {{ page.bidul.mois|capfirst }} {{ page.bidul.annee }}{% endblock %}
+
+{% block body_class %}bidul-page{% endblock %}
+
+{% block content %}
+<article class="bidul">
+    <div class="container">
+        {# En-tête #}
+        <header class="bidul__header">
+            <div class="bidul__header-content">
+                <p class="bidul__number">N°{{ page.bidul.numero }}</p>
+                <h1 class="bidul__title">Le Bidul de {{ page.bidul.mois|capfirst }} {{ page.bidul.annee }}</h1>
+                <p class="bidul__date">Publié le {{ page.bidul.date_publication|date:"d F Y" }}</p>
+                
+                {% if page.pdf %}
+                <a href="{{ page.pdf.url }}" class="btn btn--primary" download>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Télécharger le PDF
+                </a>
+                {% endif %}
+            </div>
+            
+            {% if page.couverture %}
+            <div class="bidul__cover">
+                {% image page.couverture width-400 as cover %}
+                <img src="{{ cover.url }}" alt="Couverture Bidul n°{{ page.bidul.numero }}">
+            </div>
+            {% endif %}
+        </header>
+        
+        {# Éditorial #}
+        {% if page.editorial %}
+        <section class="bidul__editorial">
+            <h2>Édito</h2>
+            <div class="prose">
+                {{ page.editorial|linebreaks }}
+            </div>
+        </section>
+        {% endif %}
+        
+        {# Contenu StreamField #}
+        {% if page.contenu %}
+        <section class="bidul__content">
+            {% for block in page.contenu %}
+                {% if block.block_type == 'texte' %}
+                    <div class="prose">{{ block.value|richtext }}</div>
+                {% elif block.block_type == 'image' %}
+                    <figure class="content-image">
+                        {% image block.value width-800 as content_img %}
+                        <img src="{{ content_img.url }}" alt="{{ block.value.title }}">
+                        {% if block.value.title %}
+                        <figcaption>{{ block.value.title }}</figcaption>
+                        {% endif %}
+                    </figure>
+                {% elif block.block_type == 'citation' %}
+                    <blockquote class="quote">{{ block.value }}</blockquote>
+                {% elif block.block_type == 'embed' %}
+                    <div class="embed">{{ block.value }}</div>
+                {% endif %}
+            {% endfor %}
+        </section>
+        {% endif %}
+        
+        {# Événements de ce numéro #}
+        {% if page.evenements %}
+        <section class="bidul__events">
+            <h2>Événements de ce numéro</h2>
+            <p class="bidul__events-count">{{ page.bidul.nb_evenements }} événements</p>
+            <div class="events-list">
+                {% for event in page.evenements|slice:":10" %}
+                <article class="event-item">
+                    <div class="event-item__date">
+                        {{ event.date_debut|date:"d/m" }}
+                    </div>
+                    <div class="event-item__content">
+                        <h3>{{ event.titre }}</h3>
+                        <p>{{ event.lieu.nom }} - {{ event.lieu.ville }}</p>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% if page.evenements.count > 10 %}
+            <a href="/agenda/?bidul={{ page.bidul.numero }}" class="btn btn--outline">
+                Voir tous les événements
+            </a>
+            {% endif %}
+        </section>
+        {% endif %}
+        
+        {# Navigation entre numéros #}
+        <nav class="bidul__nav">
+            {% if page.get_prev_sibling %}
+            <a href="{{ page.get_prev_sibling.url }}" class="bidul__nav-link bidul__nav-link--prev">
+                ← Numéro précédent
+            </a>
+            {% endif %}
+            
+            <a href="/biduls/" class="bidul__nav-link bidul__nav-link--all">
+                Tous les numéros
+            </a>
+            
+            {% if page.get_next_sibling %}
+            <a href="{{ page.get_next_sibling.url }}" class="bidul__nav-link bidul__nav-link--next">
+                Numéro suivant →
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</article>
+{% endblock %}

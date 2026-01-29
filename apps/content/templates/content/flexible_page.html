@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block body_class %}flexible-page{% endblock %}
+
+{% block content %}
+<div class="container container--narrow">
+    <header class="page-header">
+        <h1 class="page-header__title">{{ page.title }}</h1>
+    </header>
+    
+    <div class="page-content prose">
+        {% for block in page.contenu %}
+            {% if block.block_type == 'texte' %}
+                {{ block.value|richtext }}
+            
+            {% elif block.block_type == 'image' %}
+                <figure class="content-image">
+                    {% image block.value width-800 as content_img %}
+                    <img src="{{ content_img.url }}" alt="{{ block.value.title }}">
+                    {% if block.value.title %}
+                    <figcaption>{{ block.value.title }}</figcaption>
+                    {% endif %}
+                </figure>
+            
+            {% elif block.block_type == 'galerie' %}
+                <div class="gallery">
+                    {% for img in block.value %}
+                        {% image img fill-300x300 as gallery_img %}
+                        <figure class="gallery__item">
+                            <a href="{% image img width-1200 %}{{ img.url }}" target="_blank">
+                                <img src="{{ gallery_img.url }}" alt="{{ img.title }}">
+                            </a>
+                        </figure>
+                    {% endfor %}
+                </div>
+            
+            {% elif block.block_type == 'citation' %}
+                <blockquote class="quote">
+                    {{ block.value }}
+                </blockquote>
+            
+            {% elif block.block_type == 'embed' %}
+                <div class="embed-container">
+                    {{ block.value }}
+                </div>
+            {% endif %}
+        {% empty %}
+            <p>Cette page n'a pas encore de contenu.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
