@@ -3,7 +3,10 @@ Django settings for lebidul project - Base configuration.
 """
 
 import os
+
 from pathlib import Path
+from django.conf import settings
+from django.conf.urls.static import static
 
 from dotenv import load_dotenv
 
@@ -14,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # SECURITY
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = []
 
 # Application definition
@@ -131,6 +134,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -138,6 +142,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Wagtail settings
 WAGTAIL_SITE_NAME = "Le Bidul"
 WAGTAILADMIN_BASE_URL = os.getenv("WAGTAILADMIN_BASE_URL", "http://localhost:8000")
+
+# Branding
+WAGTAIL_ADMIN_LOGO = "images/logo-bidul-admin.png"  # Mettre le logo dans static/images/
+
 WAGTAIL_I18N_ENABLED = False
 
 # Search
@@ -147,9 +155,35 @@ WAGTAILSEARCH_BACKENDS = {
     }
 }
 
-# Images
+# Limites d'upload
 WAGTAILIMAGES_IMAGE_MODEL = "wagtailimages.Image"
-WAGTAILIMAGES_MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+WAGTAILIMAGES_MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB pour les images
+WAGTAILDOCS_MAX_UPLOAD_SIZE = 50 * 1024 * 1024    # 50 MB pour les documents (PDFs)
+
+# Limite Django globale
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024    # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024    # 50 MB
+
+# Types de fichiers autorisés pour les documents
+WAGTAILDOCS_EXTENSIONS = [
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "txt", "rtf", "csv", "zip"
+]
+
+# Tailles prédéfinies pour les images
+WAGTAILIMAGES_RENDITION_FILTERS = {
+    "thumbnail": "fill-100x100",
+    "small": "fill-300x300",
+    "medium": "fill-600x400",
+    "large": "fill-1200x800",
+    "hero": "fill-1920x600",
+}
+
+# Format par défaut
+WAGTAILIMAGES_FORMAT_CONVERSIONS = {
+    "bmp": "jpeg",
+    "webp": "webp",
+}
 
 # REST Framework
 REST_FRAMEWORK = {

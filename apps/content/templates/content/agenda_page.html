@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block meta_description %}Agenda culturel du Mans - Concerts, spectacles, expos{% endblock %}
+
+{% block body_class %}agenda-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" />
+<style>
+.agenda-layout {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 2rem;
+}
+@media (max-width: 1024px) {
+    .agenda-layout { grid-template-columns: 1fr; }
+}
+.agenda-sidebar { position: sticky; top: 1rem; }
+#calendar { background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+#map-agenda { height: 300px; border-radius: 8px; margin-top: 1rem; }
+.fc-event { cursor: pointer; }
+.event-popup { max-width: 300px; }
+.event-popup__title { font-weight: bold; margin-bottom: 0.5rem; }
+.event-popup__meta { font-size: 0.875rem; color: #666; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header class="page-header">
+        <h1 class="page-header__title">{{ page.title }}</h1>
+        {% if page.introduction %}
+        <p class="page-header__intro">{{ page.introduction }}</p>
+        {% endif %}
+    </header>
+    
+    {# Filtres #}
+    <div class="filters filters--row">
+        <div class="filters__group">
+            <label for="filter-categorie">Catégorie</label>
+            <select id="filter-categorie">
+                <option value="">Toutes</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="filters__group">
+            <label for="filter-ville">Ville</label>
+            <select id="filter-ville">
+                <option value="">Toutes</option>
+                {% for ville in villes %}
+                <option value="{{ ville }}">{{ ville }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="filters__group">
+            <label for="filter-search">Recherche</label>
+            <input type="text" id="filter-search" placeholder="Nom de l'événement...">
+        </div>
+        
+        <button class="btn btn--secondary" onclick="resetFilters()">Réinitialiser</button>
+    </div>
+    
+    <div class="agenda-layout">
+        {# Calendrier principal #}
+        <main class="agenda-main">
+            <div id="calendar"></div>
+        </main>
+        
+        {# Sidebar : Carte + Liste #}
+        <aside class="agenda-sidebar">
+            <div id="map-agenda"></div>
+            
+            <div class="upcoming-events">
+                <h3>Prochains événements</h3>
+                <div id="events-list" class="events-list events-list--compact">
+                    {# Rempli dynamiquement #}
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+{# Modal détail événement #}
+<div id="event-modal" class="modal" style="display: none;">
+    <div class="modal__backdrop" onclick="closeModal()"></div>
+    <div class="modal__content">
+        <button class="modal__close" onclick="closeModal()">&times;</button>
+        <div id="event-modal-body"></div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.8/locales/fr.global.min.js"></script>
+<script>
+let calendar, map, markers = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCalendar();
+    initMap();
+    loadEvents();
+});
+
+function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'fr',
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,listWeek'
+        },
+        events: function(info, successCallback, failureCallback) {
+            fetchEvents(info.start, info.end).then(successCallback).catch(failureCallback);
+        },
+        eventClick: function(info) {
+            showEventDetail(info.event.extendedProps);
+        },
+        eventDidMount: function(info) {
+            if (info.event.extendedProps.categorie_couleur) {
+                info.el.style.backgroundColor = info.event.extendedProps.categorie_couleur;
+                info.el.style.borderColor = info.event.extendedProps.categorie_couleur;
+            }
+        }
+    });
+    calendar.render();
+}
+
+function initMap() {
+    map = L.map('map-agenda').setView([47.9960, 0.1926], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+}
+
+async function fetchEvents(start, end) {
+    const params = new URLSearchParams({
+        date_min: start.toISOString().split('T')[0],
+        date_max: end.toISOString().split('T')[0]
+    });
+    
+    // Ajouter les filtres
+    const categorie = document.getElementById('filter-categorie').value;
+    const ville = document.getElementById('filter-ville').value;
+    const search = document.getElementById('filter-search').value;
+    
+    if (categorie) params.append('categorie', categorie);
+    if (ville) params.append('ville', ville);
+    if (search) params.append('search', search);
+    
+    const response = await fetch(`/api/evenements/?${params}`);
+    const data = await response.json();
+    
+    // Mettre à jour la carte
+    updateMapMarkers(data.results || data);
+    
+    // Convertir pour FullCalendar
+    return (data.results || data).map(event => ({
+        id: event.id,
+        title: event.titre,
+        start: event.date_debut + (event.heure_debut ? 'T' + event.heure_debut : ''),
+        end: event.date_fin ? event.date_fin + (event.heure_fin ? 'T' + event.heure_fin : '') : null,
+        extendedProps: event
+    }));
+}
+
+function updateMapMarkers(events) {
+    // Supprimer anciens markers
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    
+    // Ajouter nouveaux markers
+    events.forEach(event => {
+        if (event.lieu && event.lieu.latitude && event.lieu.longitude) {
+            const marker = L.marker([event.lieu.latitude, event.lieu.longitude])
+                .bindPopup(`
+                    <div class="event-popup">
+                        <div class="event-popup__title">${event.titre}</div>
+                        <div class="event-popup__meta">
+                            ${event.date_debut} · ${event.lieu.nom}
+                        </div>
+                    </div>
+                `)
+                .addTo(map);
+            markers.push(marker);
+        }
+    });
+    
+    // Ajuster la vue si markers
+    if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [20, 20], maxZoom: 14 });
+    }
+}
+
+async function loadEvents() {
+    const response = await fetch('/api/evenements/?limit=10');
+    const data = await response.json();
+    renderEventsList(data.results || data);
+}
+
+function renderEventsList(events) {
+    const container = document.getElementById('events-list');
+    container.innerHTML = events.slice(0, 5).map(event => `
+        <article class="event-item event-item--small" onclick="showEventDetail(${JSON.stringify(event).replace(/"/g, '&quot;')})">
+            <div class="event-item__date">
+                <span class="event-item__day">${new Date(event.date_debut).getDate()}</span>
+                <span class="event-item__month">${new Date(event.date_debut).toLocaleDateString('fr-FR', {month: 'short'})}</span>
+            </div>
+            <div class="event-item__content">
+                <h4 class="event-item__title">${event.titre}</h4>
+                <p class="event-item__lieu">${event.lieu?.nom || ''}</p>
+            </div>
+        </article>
+    `).join('');
+}
+
+function showEventDetail(event) {
+    const modal = document.getElementById('event-modal');
+    const body = document.getElementById('event-modal-body');
+    
+    body.innerHTML = `
+        <h2>${event.titre}</h2>
+        <p><strong>Date :</strong> ${event.date_debut}${event.date_fin && event.date_fin !== event.date_debut ? ' au ' + event.date_fin : ''}</p>
+        ${event.heure_debut ? `<p><strong>Heure :</strong> ${event.heure_debut}</p>` : ''}
+        <p><strong>Lieu :</strong> ${event.lieu?.nom || 'Non précisé'} - ${event.lieu?.ville || ''}</p>
+        ${event.categorie ? `<p><strong>Catégorie :</strong> ${event.categorie.nom}</p>` : ''}
+        ${event.prix ? `<p><strong>Prix :</strong> ${event.prix}</p>` : ''}
+        ${event.description ? `<div class="prose">${event.description}</div>` : ''}
+        ${event.url ? `<p><a href="${event.url}" target="_blank" class="btn btn--primary">Plus d'infos</a></p>` : ''}
+    `;
+    
+    modal.style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('event-modal').style.display = 'none';
+}
+
+function resetFilters() {
+    document.getElementById('filter-categorie').value = '';
+    document.getElementById('filter-ville').value = '';
+    document.getElementById('filter-search').value = '';
+    calendar.refetchEvents();
+}
+
+// Listeners filtres
+['filter-categorie', 'filter-ville'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => calendar.refetchEvents());
+});
+document.getElementById('filter-search').addEventListener('input', debounce(() => calendar.refetchEvents(), 300));
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Fermer modal avec Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+{% endblock %}
+{% endblock %}

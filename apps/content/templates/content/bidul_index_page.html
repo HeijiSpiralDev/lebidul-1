@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block meta_description %}Archives de tous les numéros du Bidul - Agenda culturel du Mans{% endblock %}
+
+{% block body_class %}bidul-index{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header class="page-header">
+        <h1 class="page-header__title">{{ page.title }}</h1>
+        {% if page.introduction %}
+        <p class="page-header__intro">{{ page.introduction }}</p>
+        {% endif %}
+    </header>
+    
+    {# Filtres par année #}
+    <div class="filters">
+        <label for="year-filter">Filtrer par année :</label>
+        <select id="year-filter" onchange="filterByYear(this.value)">
+            <option value="">Toutes les années</option>
+            {% regroup biduls by bidul.annee as biduls_by_year %}
+            {% for year_group in biduls_by_year %}
+            <option value="{{ year_group.grouper }}">{{ year_group.grouper }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    {# Grille des Biduls #}
+    <div class="biduls-grid biduls-grid--large">
+        {% for bidul_page in biduls %}
+        <article class="bidul-card" data-year="{{ bidul_page.bidul.annee }}">
+            <a href="{{ bidul_page.url }}" class="bidul-card__link">
+                {% if bidul_page.couverture %}
+                    {% image bidul_page.couverture fill-300x420 as cover %}
+                    <img src="{{ cover.url }}" alt="Bidul n°{{ bidul_page.bidul.numero }}" class="bidul-card__cover">
+                {% else %}
+                    <div class="bidul-card__cover bidul-card__cover--placeholder">
+                        <span class="bidul-card__placeholder-text">N°{{ bidul_page.bidul.numero }}</span>
+                    </div>
+                {% endif %}
+                
+                <div class="bidul-card__overlay">
+                    <span class="bidul-card__numero">N°{{ bidul_page.bidul.numero }}</span>
+                </div>
+            </a>
+            
+            <div class="bidul-card__info">
+                <h2 class="bidul-card__title">
+                    <a href="{{ bidul_page.url }}">
+                        {{ bidul_page.bidul.mois|capfirst }} {{ bidul_page.bidul.annee }}
+                    </a>
+                </h2>
+                {% if bidul_page.bidul.nb_evenements %}
+                <p class="bidul-card__meta">{{ bidul_page.bidul.nb_evenements }} événements</p>
+                {% endif %}
+            </div>
+        </article>
+        {% empty %}
+        <p class="no-results">Aucun numéro disponible pour le moment.</p>
+        {% endfor %}
+    </div>
+    
+    {# Pagination #}
+    {% if biduls.has_other_pages %}
+    <nav class="pagination">
+        {% if biduls.has_previous %}
+        <a href="?page={{ biduls.previous_page_number }}" class="pagination__link">← Précédent</a>
+        {% endif %}
+        
+        <span class="pagination__current">
+            Page {{ biduls.number }} sur {{ biduls.paginator.num_pages }}
+        </span>
+        
+        {% if biduls.has_next %}
+        <a href="?page={{ biduls.next_page_number }}" class="pagination__link">Suivant →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+function filterByYear(year) {
+    const cards = document.querySelectorAll('.bidul-card');
+    cards.forEach(card => {
+        if (!year || card.dataset.year === year) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

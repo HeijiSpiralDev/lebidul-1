@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block meta_description %}Lieux culturels du Mans et de la Sarthe - Le Bidul{% endblock %}
+
+{% block body_class %}lieux-index{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header class="page-header">
+        <h1 class="page-header__title">{{ page.title }}</h1>
+        {% if page.introduction %}
+        <p class="page-header__intro">{{ page.introduction }}</p>
+        {% endif %}
+    </header>
+    
+    {# Vue toggle : Liste / Carte #}
+    <div class="view-toggle">
+        <button class="view-toggle__btn view-toggle__btn--active" data-view="list">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            Liste
+        </button>
+        <button class="view-toggle__btn" data-view="map">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                <line x1="8" y1="2" x2="8" y2="18"></line>
+                <line x1="16" y1="6" x2="16" y2="22"></line>
+            </svg>
+            Carte
+        </button>
+    </div>
+    
+    {# Filtre par ville #}
+    <div class="filters">
+        <label for="ville-filter">Filtrer par ville :</label>
+        <select id="ville-filter" onchange="filterByVille(this.value)">
+            <option value="">Toutes les villes</option>
+            {% regroup lieux by lieu.ville as lieux_by_ville %}
+            {% for ville_group in lieux_by_ville %}
+            <option value="{{ ville_group.grouper }}">{{ ville_group.grouper }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    {# Vue Liste #}
+    <div class="lieux-view lieux-view--list" id="view-list">
+        <div class="lieux-grid">
+            {% for lieu_page in lieux %}
+            <article class="lieu-card" data-ville="{{ lieu_page.lieu.ville }}">
+                <a href="{{ lieu_page.url }}" class="lieu-card__link">
+                    {% if lieu_page.lieu.photo %}
+                        {% image lieu_page.lieu.photo fill-400x250 as lieu_img %}
+                        <img src="{{ lieu_img.url }}" alt="{{ lieu_page.lieu.nom }}" class="lieu-card__image">
+                    {% else %}
+                        <div class="lieu-card__image lieu-card__image--placeholder">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                        </div>
+                    {% endif %}
+                </a>
+                <div class="lieu-card__content">
+                    <h2 class="lieu-card__title">
+                        <a href="{{ lieu_page.url }}">{{ lieu_page.lieu.nom }}</a>
+                    </h2>
+                    <p class="lieu-card__city">{{ lieu_page.lieu.ville }}</p>
+                    {% if lieu_page.lieu.adresse %}
+                    <p class="lieu-card__address">{{ lieu_page.lieu.adresse }}</p>
+                    {% endif %}
+                </div>
+            </article>
+            {% empty %}
+            <p class="no-results">Aucun lieu disponible.</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    {# Vue Carte #}
+    <div class="lieux-view lieux-view--map" id="view-map" style="display: none;">
+        <div id="map-lieux" class="map-container"></div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+<script>
+// Toggle vue Liste/Carte
+document.querySelectorAll('.view-toggle__btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const view = this.dataset.view;
+        
+        // Toggle boutons
+        document.querySelectorAll('.view-toggle__btn').forEach(b => b.classList.remove('view-toggle__btn--active'));
+        this.classList.add('view-toggle__btn--active');
+        
+        // Toggle vues
+        document.getElementById('view-list').style.display = view === 'list' ? '' : 'none';
+        document.getElementById('view-map').style.display = view === 'map' ? '' : 'none';
+        
+        // Init carte si première fois
+        if (view === 'map' && !window.mapInitialized) {
+            initMap();
+        }
+    });
+});
+
+// Filtre par ville
+function filterByVille(ville) {
+    document.querySelectorAll('.lieu-card').forEach(card => {
+        if (!ville || card.dataset.ville === ville) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+// Initialisation de la carte
+function initMap() {
+    const map = L.map('map-lieux').setView([47.9960, 0.1926], 12); // Le Mans
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    const markers = L.markerClusterGroup();
+    
+    // Charger les lieux via API
+    fetch('/api/lieux/geojson/')
+        .then(response => response.json())
+        .then(data => {
+            L.geoJSON(data, {
+                onEachFeature: function(feature, layer) {
+                    const props = feature.properties;
+                    layer.bindPopup(`
+                        <strong>${props.nom}</strong><br>
+                        ${props.adresse}<br>
+                        <a href="/lieux/${props.slug}/">Voir la fiche</a>
+                    `);
+                }
+            }).addTo(markers);
+            
+            map.addLayer(markers);
+            
+            if (data.features.length > 0) {
+                map.fitBounds(markers.getBounds(), { padding: [20, 20] });
+            }
+        });
+    
+    window.mapInitialized = true;
+}
+</script>
+{% endblock %}
+{% endblock %}

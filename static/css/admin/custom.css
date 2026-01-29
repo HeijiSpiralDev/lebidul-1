@@ -1,0 +1,7 @@
+/* Personnalisation admin Le Bidul */
+
+/* Couleur principale */
+:root {
+    --w-color-primary: #E63946;
+    --w-color-primary-200: #f8d7da;
+}

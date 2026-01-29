@@ -1,0 +1,63 @@
+{% load static wagtailcore_tags wagtailuserbar %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block meta_description %}Le Bidul - Agenda culturel du Mans{% endblock %}">
+    
+    <title>{% block title %}{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}{% endif %} - Le Bidul{% endblock %}</title>
+    
+    {# Google Fonts depuis ThemeSettings #}
+    {% if google_fonts_url %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="{{ google_fonts_url }}" rel="stylesheet">
+    {% endif %}
+    
+    {# CSS #}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    
+    {# Variables CSS dynamiques depuis ThemeSettings #}
+    <style>
+        :root {
+            {% for var, value in css_variables.items %}
+            {{ var }}: {{ value }};
+            {% endfor %}
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    
+    {# Barre utilisateur Wagtail (visible pour les admins) #}
+    {% wagtailuserbar %}
+    
+    {# Header #}
+    {% include "includes/header.html" %}
+    
+    {# Messages flash #}
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="message message--{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {# Contenu principal #}
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    
+    {# Footer #}
+    {% include "includes/footer.html" %}
+    
+    {# JavaScript #}
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
