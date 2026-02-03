@@ -19,6 +19,9 @@ venv/
 /staticfiles/
 media/
 
+#Database
+lebidularts_mysql_db.sql
+
 # IDEs
 .vscode/
 .idea/
