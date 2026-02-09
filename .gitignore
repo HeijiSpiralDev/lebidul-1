@@ -20,7 +20,7 @@ venv/
 media/
 
 #Database
-lebidularts_mysql_db.sql
+Dump20260209.sql
 
 # IDEs
 .vscode/

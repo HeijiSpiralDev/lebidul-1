@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "apps.agenda",
     "apps.content",
     "apps.theme",
+    "apps.migration",
     
     # Wagtail
     "wagtail.contrib.forms",
