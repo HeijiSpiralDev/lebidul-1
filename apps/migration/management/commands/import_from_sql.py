@@ -1,5 +1,5 @@
 """
-Migration WordPress SQL dump → Wagtail.
+Migration WordPress SQL dump > Wagtail.
 
 Parse directement le fichier SQL sans nécessiter MySQL local.
 
@@ -10,6 +10,8 @@ Usage:
 """
 
 import re
+import zipfile
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -17,12 +19,21 @@ from django.core.files.images import ImageFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.text import slugify
+from django.core.files.base import ContentFile
 
 from wagtail.images.models import Image
 from wagtail.models import Page
+from wagtail.documents.models import Document
 
 from apps.agenda.models import Auteur, Categorie
 from apps.content.models import ArticleIndexPage, ArticlePage, HomePage
+
+# Configuration pour rarfile (après les imports)
+try:
+    import rarfile
+    rarfile.UNRAR_TOOL = r"C:\Program Files\7-Zip\7z.exe"
+except ImportError:
+    pass
 
 
 class SQLDumpParser:
@@ -206,6 +217,11 @@ class Command(BaseCommand):
             help="Chemin vers le dossier des médias WordPress (wp-content/uploads)",
         )
         parser.add_argument(
+            "--documents",  # ← NOUVEAU
+            type=str,
+            help="Chemin vers le dossier des documents WordPress (wp-content/uploads/documents)",
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Simule l'import sans modifier la base",
@@ -227,6 +243,7 @@ class Command(BaseCommand):
         self.dry_run = options["dry_run"]
         self.sql_path = Path(options["sql"])
         self.media_path = Path(options["media"]) if options["media"] else None
+        self.documents_path = Path(options["documents"]) if options["documents"] else None
         self.prefix = options["prefix"]
         self.limit = options["limit"]
 
@@ -267,15 +284,17 @@ class Command(BaseCommand):
             "authors": 0,
             "articles": 0,
             "media": 0,
+            "documents" : 0,
             "skipped": 0,
             "errors": 0,
         }
 
         # Mappings
-        self.category_map = {}  # term_id → Categorie
-        self.author_map = {}    # user_id → Auteur
-        self.media_map = {}     # post_id → Image
-        self.term_taxonomy_map = {}  # term_taxonomy_id → term_id
+        self.category_map = {}  # term_id > Categorie
+        self.author_map = {}    # user_id > Auteur
+        self.media_map = {}     # post_id > Image
+        self.term_taxonomy_map = {}  # term_taxonomy_id > term_id
+        self.document_map = {}
 
         with transaction.atomic():
             if self.dry_run:
@@ -288,6 +307,7 @@ class Command(BaseCommand):
             self.import_categories()
             self.import_authors()
             self.import_media()
+            self.import_documents()
             self.import_articles()
 
             if self.dry_run:
@@ -302,7 +322,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  {key}: {count}")
 
     def _build_term_taxonomy_map(self):
-        """Construit le mapping term_taxonomy_id → term_id."""
+        """Construit le mapping term_taxonomy_id > term_id."""
         rows = self.data.get(f"{self.prefix}term_taxonomy", [])
         for row in rows:
             if len(row) >= 3:
@@ -322,7 +342,7 @@ class Command(BaseCommand):
 
     def import_categories(self):
         """Import des catégories WordPress."""
-        self.stdout.write("\n→ Import des catégories...")
+        self.stdout.write("\n> Import des catégories...")
 
         terms = self.data.get(f"{self.prefix}terms", [])
         term_taxonomy = self.data.get(f"{self.prefix}term_taxonomy", [])
@@ -362,7 +382,7 @@ class Command(BaseCommand):
 
     def import_authors(self):
         """Import des auteurs WordPress."""
-        self.stdout.write("\n→ Import des auteurs...")
+        self.stdout.write("\n> Import des auteurs...")
 
         users = self.data.get(f"{self.prefix}users", [])
 
@@ -395,10 +415,10 @@ class Command(BaseCommand):
     def import_media(self):
         """Import des médias (attachments)."""
         if not self.media_path:
-            self.stdout.write("\n→ Import des médias: SKIPPED (pas de dossier --media)")
+            self.stdout.write("\n> Import des médias: SKIPPED (pas de dossier --media)")
             return
 
-        self.stdout.write("\n→ Import des médias...")
+        self.stdout.write("\n> Import des médias...")
 
         posts = self.data.get(f"{self.prefix}posts", [])
 
@@ -417,17 +437,51 @@ class Command(BaseCommand):
 
             # Extraire le chemin relatif depuis l'URL
             # Ex: https://lebidul.com/wp-content/uploads/2024/01/image.jpg
-            # → 2024/01/image.jpg
+            # > 2024/01/image.jpg
             match = re.search(r"/uploads/(.+)$", guid)
             if not match:
                 continue
 
             relative_path = match.group(1)
-            local_path = self.media_path / relative_path
+            local_path = self.media_path / relative_path.replace('/', '\\')
+
+            # Trier selon l'extension
+            extension = local_path.suffix.lower()
+            extensions_images = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
+            extensions_documents = {'.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt', '.odt', '.ods'}
+            
+            if extension in extensions_images:
+                # C'est une image → continuer normalement
+                pass
+            elif extension in extensions_documents and local_path.exists():
+                # C'est un document → importer comme document Wagtail
+                try:
+                    with open(local_path, 'rb') as f:
+                        doc_data = f.read()
+                    self._save_document(local_path.name, doc_data)
+                except Exception as e:
+                    self.stats["errors"] += 1
+                    self.stdout.write(self.style.ERROR(f"  X Erreur document media: {e}"))
+                continue
+            elif extension == '.zip' and local_path.exists():
+                # C'est un ZIP → extraire et importer les PDFs dedans
+                self._import_from_zip(local_path)
+                continue
+            elif extension == '.rar' and local_path.exists():
+                # C'est un RAR → extraire et importer les PDFs dedans
+                self._import_from_rar(local_path)
+                continue
+            else:
+                # Autre fichier non supporté → skipper
+                self.stats["skipped"] += 1
+                self.stdout.write(self.style.WARNING(f"  ! Extension non supportée: {local_path.name} ({extension})"))
+                continue
+            
 
             if not local_path.exists():
                 # Essayer sans le préfixe de date
                 self.stats["skipped"] += 1
+                self.stdout.write(self.style.WARNING(f"  ! Fichier introuvable: {local_path}"))
                 continue
 
             if not self.dry_run:
@@ -447,7 +501,7 @@ class Command(BaseCommand):
 
     def import_articles(self):
         """Import des articles WordPress avec gestion des doublons."""
-        self.stdout.write("\n→ Import des articles...")
+        self.stdout.write("\n> Import des articles...")
 
         # ======================================================
         # SOLUTION 1 : Vérifier si les pages existent déjà
@@ -499,9 +553,9 @@ class Command(BaseCommand):
                 home.add_child(instance=parent_page)
                 self.stdout.write(self.style.SUCCESS("  ✓ ArticleIndexPage créée"))
 
-        # Récupérer les relations article → catégories
+        # Récupérer les relations article > catégories
         term_relationships = self.data.get(f"{self.prefix}term_relationships", [])
-        post_categories = {}  # post_id → [term_ids]
+        post_categories = {}  # post_id > [term_ids]
         for row in term_relationships:
             if len(row) >= 2:
                 object_id = row[0]
@@ -516,7 +570,7 @@ class Command(BaseCommand):
 
         # Récupérer les thumbnails (featured images)
         postmeta = self.data.get(f"{self.prefix}postmeta", [])
-        post_thumbnails = {}  # post_id → thumbnail_id
+        post_thumbnails = {}  # post_id > thumbnail_id
         for row in postmeta:
             data = self._get_row_dict("postmeta", row)
             if data.get("meta_key") == "_thumbnail_id":
@@ -570,6 +624,7 @@ class Command(BaseCommand):
 
             # Nettoyer le contenu
             content = self.clean_html(content)
+            content = self.replace_internal_links(content)
             intro = excerpt or self.extract_intro(content)
 
             if not self.dry_run:
@@ -626,25 +681,151 @@ class Command(BaseCommand):
         if not html:
             return ""
 
-        # Supprimer les shortcodes WordPress [shortcode]...[/shortcode]
+        # Supprimer les shortcodes WordPress
         html = re.sub(r'\[/?[^\]]+\]', '', html)
 
         # Supprimer les commentaires HTML
         html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
 
-        # Supprimer les classes WordPress
-        html = re.sub(r'\s+class="[^"]*"', '', html)
-
-        # Supprimer les styles inline
-        html = re.sub(r'\s+style="[^"]*"', '', html)
-
-        # Supprimer les data-* attributes
-        html = re.sub(r'\s+data-[a-z-]+="[^"]*"', '', html)
+        try:
+            from bs4 import BeautifulSoup
+            
+            # Parser avec html.parser (plus strict, corrige mieux)
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # Supprimer tous les attributs sauf les essentiels
+            for tag in soup.find_all(True):
+                allowed_attrs = {
+                    'a': ['href', 'title'],
+                    'img': ['src', 'alt', 'title'],
+                    'iframe': ['src', 'width', 'height'],
+                }
+                
+                if tag.name in allowed_attrs:
+                    attrs = dict(tag.attrs)
+                    for attr in list(attrs.keys()):
+                        if attr not in allowed_attrs[tag.name]:
+                            del tag[attr]
+                else:
+                    # Pour les autres balises, supprimer tous les attributs
+                    tag.attrs = {}
+            
+            # Corriger les balises auto-fermantes problématiques
+            for br in soup.find_all('br'):
+                br.replace_with(soup.new_tag('br'))
+            
+            for hr in soup.find_all('hr'):
+                hr.replace_with(soup.new_tag('hr'))
+            
+            # Récupérer le HTML nettoyé
+            html = str(soup)
+            
+            # Supprimer les balises html et body ajoutées par BeautifulSoup
+            html = re.sub(r'^<html><body>', '', html)
+            html = re.sub(r'</body></html>$', '', html)
+            
+        except ImportError:
+            self.stdout.write(self.style.WARNING(
+                "  ! BeautifulSoup non installé, nettoyage basique"
+            ))
+            # Nettoyage basique
+            html = re.sub(r'\s+class="[^"]*"', '', html)
+            html = re.sub(r'\s+style="[^"]*"', '', html)
+            html = re.sub(r'\s+data-[a-z-]+="[^"]*"', '', html)
+            
+            # Corriger les <br /> en <br>
+            html = re.sub(r'<br\s*/>', '<br>', html)
+            html = re.sub(r'<hr\s*/>', '<hr>', html)
 
         # Nettoyer les espaces multiples
         html = re.sub(r'\n\s*\n', '\n\n', html)
 
         return html.strip()
+    
+    def replace_internal_links(self, html):
+        """Remplace les liens vers l'ancien site par des liens locaux."""
+        if not html:
+            return ""
+        
+        url_mapping = {}
+        
+        def replace_image_url(match):
+            old_url = match.group(0)
+            
+            if old_url in url_mapping:
+                return url_mapping[old_url]
+            
+            filename_match = re.search(r'/([^/]+\.(jpg|jpeg|png|gif|webp|pdf))$', old_url, re.IGNORECASE)
+            if not filename_match:
+                return old_url
+            
+            filename = filename_match.group(1)
+            base_filename = filename.rsplit('.', 1)[0]
+            extension = filename.rsplit('.', 1)[1].lower()
+            
+            # Si c'est un PDF → chercher dans les Documents Wagtail
+            if extension == 'pdf':
+                try:
+                    # Essai 1 : Recherche exacte par nom de fichier
+                    doc = Document.objects.filter(title=base_filename).first()
+        
+                    # Essai 2 : Recherche partielle
+                    if not doc:
+                        doc = Document.objects.filter(title__icontains=base_filename).first()
+        
+                    # Essai 3 : Recherche avec juste le numéro
+                    # Ex: "2020-02-Bidul-252" → chercher "252"
+                    if not doc:
+                        parts = base_filename.split('-')
+                        for part in reversed(parts):
+                            if part.isdigit():
+                                doc = Document.objects.filter(title__icontains=part).first()
+                                if doc:
+                                    break
+        
+                    # Essai 4 : Recherche par nom de fichier dans le champ file
+                    if not doc:
+                        doc = Document.objects.filter(file__icontains=base_filename).first()
+        
+                    if doc:
+                        new_url = doc.url
+                        url_mapping[old_url] = new_url
+                    return new_url
+            
+                except Exception:
+                    pass
+            
+            # Si c'est une image → chercher dans les Images Wagtail
+            else:
+                try:
+                    image = Image.objects.filter(title__icontains=base_filename).first()
+                    if image:
+                        new_url = image.file.url
+                        url_mapping[old_url] = new_url
+                        return new_url
+                except Exception:
+                    pass
+            
+            # Si pas trouvé, garder l'URL originale plutôt que mettre #
+            url_mapping[old_url] = old_url
+            return old_url
+        
+        # Remplacer les URLs d'images et PDFs
+        html = re.sub(
+            r'https?://(?:www\.)?lebidul\.com/wp-content/uploads/[^"\'>\s]+\.(jpg|jpeg|png|gif|webp|pdf)',
+            replace_image_url,
+            html,
+            flags=re.IGNORECASE
+        )
+        
+        # Remplacer les liens internes vers des articles
+        html = re.sub(
+            r'https?://(?:www\.)?lebidul\.com/([^/"]+)/?',
+            r'/chroniques/\1/',
+            html
+        )
+        
+        return html
 
     def extract_intro(self, html, max_chars=300):
         """Extrait le début du texte comme introduction."""
@@ -664,3 +845,128 @@ class Command(BaseCommand):
                 text = text[:max_chars] + "..."
 
         return text
+    
+    def import_documents(self):
+        """Import des documents PDF depuis les dossiers locaux."""
+        if not self.documents_path:  # ← Utiliser documents_path au lieu de media_path
+            self.stdout.write("\n> Import des documents: SKIPPED (pas de dossier --documents)")
+            return
+
+        if not self.documents_path.exists():
+            self.stdout.write(self.style.WARNING(
+                f"\n> Import des documents: SKIPPED (dossier introuvable: {self.documents_path})"
+            ))
+            return
+
+        self.stdout.write(f"\n> Import des documents depuis {self.documents_path}...")
+
+        # Dossiers à scanner directement dans le dossier documents fourni
+        scan_dirs = [
+            self.documents_path / "biduls_pdf",
+            self.documents_path / "pdf_2011",
+            self.documents_path / "pdf_2012",
+            self.documents_path / "pdf_2013",
+            self.documents_path / "pdf_2014",
+        ]
+
+        for scan_dir in scan_dirs:
+            if not scan_dir.exists():
+                self.stdout.write(self.style.WARNING(f"  ! Dossier introuvable: {scan_dir.name}"))
+                continue
+
+            self.stdout.write(f"\n  > Scan de {scan_dir.name}...")
+
+            for file_path in scan_dir.iterdir():
+                if file_path.suffix.lower() == ".zip":
+                    self._import_from_zip(file_path)
+                elif file_path.suffix.lower() == ".rar":
+                    self._import_from_rar(file_path)
+                elif file_path.suffix.lower() == ".pdf":
+                    self._import_pdf(file_path)
+
+    def _import_from_zip(self, zip_path):
+        """Extrait et importe les PDFs d'un fichier ZIP."""
+        self.stdout.write(f"    > ZIP: {zip_path.name}")
+        
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                for filename in zf.namelist():
+                    if filename.lower().endswith('.pdf'):
+                        self.stdout.write(f"      > PDF trouvé dans ZIP: {filename}")
+                        
+                        # Lire le PDF depuis le ZIP
+                        pdf_data = zf.read(filename)
+                        pdf_name = Path(filename).name
+                        
+                        # Importer dans Wagtail
+                        self._save_document(pdf_name, pdf_data)
+                        
+        except zipfile.BadZipFile:
+            self.stdout.write(self.style.ERROR(f"    X ZIP corrompu: {zip_path.name}"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"    X Erreur ZIP {zip_path.name}: {e}"))
+
+    def _import_from_rar(self, rar_path):
+        """Extrait et importe les PDFs d'un fichier RAR."""
+        self.stdout.write(f"    > RAR: {rar_path.name}")
+        
+        try:
+            import rarfile
+            with rarfile.RarFile(str(rar_path), 'r') as rf:
+                for filename in rf.namelist():
+                    if filename.lower().endswith('.pdf'):
+                        self.stdout.write(f"      > PDF trouvé dans RAR: {filename}")
+                        
+                        # Lire le PDF depuis le RAR
+                        pdf_data = rf.read(filename)
+                        pdf_name = Path(filename).name
+                        
+                        # Importer dans Wagtail
+                        self._save_document(pdf_name, pdf_data)
+                        
+        except ImportError:
+            self.stdout.write(self.style.WARNING(
+                f"    ! rarfile non installé, skip {rar_path.name}\n"
+                f"      Installez avec: pip install rarfile"
+            ))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"    X Erreur RAR {rar_path.name}: {e}"))
+
+    def _import_pdf(self, pdf_path):
+        """Importe un PDF directement."""
+        self.stdout.write(f"    > PDF: {pdf_path.name}")
+        
+        try:
+            with open(pdf_path, 'rb') as f:
+                pdf_data = f.read()
+            self._save_document(pdf_path.name, pdf_data)
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"    X Erreur PDF {pdf_path.name}: {e}"))
+
+    def _save_document(self, filename, pdf_data):
+        """Sauvegarde un PDF dans Wagtail Documents."""
+        # Nettoyer le nom du fichier
+        title = Path(filename).stem  # Nom sans extension
+        
+        # Vérifier si déjà importé
+        existing = Document.objects.filter(title=title).first()
+        if existing:
+            self.stdout.write(f"      - Existe deja: {title}")
+            self.stats["skipped"] += 1
+            # Stocker dans le mapping pour la liaison avec les articles
+            self.document_map[filename] = existing
+            return
+
+        if not self.dry_run:
+            try:
+                doc = Document(title=title)
+                doc.file.save(filename, ContentFile(pdf_data), save=True)
+                self.document_map[filename] = doc
+                self.stats["documents"] += 1
+                self.stdout.write(f"      OK Document importé: {filename}")
+            except Exception as e:
+                self.stats["errors"] += 1
+                self.stdout.write(self.style.ERROR(f"      X Erreur sauvegarde {filename}: {e}"))
+        else:
+            self.stats["documents"] += 1
+            self.stdout.write(f"      [DRY] Document: {filename}")
