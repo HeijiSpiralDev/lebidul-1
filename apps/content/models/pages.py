@@ -20,6 +20,7 @@ from wagtail.fields import StreamField
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 from wagtail.search import index
+from wagtail.documents.models import Document
 
 
 # ===== STREAM BLOCKS =====
@@ -305,6 +306,17 @@ class ArticlePage(Page):
         related_name="+",
     )
     
+    # ← NOUVEAU CHAMP PDF
+    fichier_pdf = models.ForeignKey(
+        "wagtaildocs.Document",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Fichier PDF",
+        help_text="PDF téléchargeable lié à cet article",
+    )
+    
     introduction = models.TextField(
         blank=True,
         help_text="Chapô affiché en liste",
@@ -331,7 +343,6 @@ class ArticlePage(Page):
         help_text="Afficher en une",
     )
     
-    # Search
     search_fields = Page.search_fields + [
         index.SearchField("introduction"),
         index.RelatedFields("auteur", [
@@ -345,9 +356,10 @@ class ArticlePage(Page):
                 FieldPanel("auteur"),
                 FieldPanel("date_publication"),
             ],
-            heading="Métadonnées",
+            heading="Metadonnees",
         ),
         FieldPanel("image_principale"),
+        FieldPanel("fichier_pdf"),  # ← NOUVEAU PANEL
         FieldPanel("introduction"),
         FieldPanel("contenu"),
         MultiFieldPanel(

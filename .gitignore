@@ -19,6 +19,9 @@ venv/
 /staticfiles/
 media/
 
+#Database
+Dump20260209.sql
+
 # IDEs
 .vscode/
 .idea/

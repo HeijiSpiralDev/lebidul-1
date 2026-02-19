@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags wagtailimages_tags %}
+
+{% block meta_description %}Chroniques et articles - Le Bidul{% endblock %}
+
+{% block body_class %}article-index{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header class="page-header">
+        <h1 class="page-header__title">{{ page.title }}</h1>
+        {% if page.introduction %}
+        <p class="page-header__intro">{{ page.introduction }}</p>
+        {% endif %}
+    </header>
+    
+    {# Filtres #}
+    <div class="filters">
+        <div class="filters__group">
+            <label for="category-filter">Catégorie :</label>
+            <select id="category-filter" onchange="applyFilters()">
+                <option value="">Toutes</option>
+                {% for cat in categories %}
+                <option value="{{ cat.slug }}" {% if request.GET.categorie == cat.slug %}selected{% endif %}>
+                    {{ cat.nom }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="filters__group">
+            <label for="author-filter">Auteur :</label>
+            <select id="author-filter" onchange="applyFilters()">
+                <option value="">Tous</option>
+                {% for auteur in auteurs %}
+                <option value="{{ auteur.slug }}" {% if request.GET.auteur == auteur.slug %}selected{% endif %}>
+                    {{ auteur.nom }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    
+    {# Liste des articles #}
+    <div class="articles-list">
+        {% for article in articles %}
+        <article class="article-card article-card--horizontal">
+            {% if article.image_principale %}
+            <a href="{{ article.url }}" class="article-card__image">
+                {% image article.image_principale fill-300x200 as article_img %}
+                <img src="{{ article_img.url }}" alt="{{ article.title }}">
+            </a>
+            {% endif %}
+            
+            <div class="article-card__content">
+                {# Catégories #}
+                {% if article.categories.all %}
+                <div class="article-card__categories">
+                    {% for cat in article.categories.all %}
+                    <span class="category-tag category-tag--small" style="background-color: {{ cat.couleur }};">
+                        {{ cat.nom }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <h2 class="article-card__title">
+                    <a href="{{ article.url }}">{{ article.title }}</a>
+                </h2>
+                
+                {% if article.introduction %}
+                <p class="article-card__excerpt">{{ article.introduction|truncatewords:30 }}</p>
+                {% endif %}
+                
+                <div class="article-card__meta">
+                    {% if article.auteur %}
+                    <span class="article-card__author">
+                        {% if article.auteur.photo %}
+                            {% image article.auteur.photo fill-30x30 as author_thumb %}
+                            <img src="{{ author_thumb.url }}" alt="" class="article-card__author-photo">
+                        {% endif %}
+                        {{ article.auteur.nom }}
+                    </span>
+                    {% endif %}
+                    <time datetime="{{ article.date_publication|date:'Y-m-d' }}">
+                        {{ article.date_publication|date:"d M Y" }}
+                    </time>
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <p class="no-results">Aucun article trouvé.</p>
+        {% endfor %}
+    </div>
+    
+    {# Pagination #}
+    {% if articles.has_other_pages %}
+    <nav class="pagination">
+        {% if articles.has_previous %}
+        <a href="?page={{ articles.previous_page_number }}" class="pagination__link">← Précédent</a>
+        {% endif %}
+        
+        <span class="pagination__current">
+            Page {{ articles.number }} sur {{ articles.paginator.num_pages }}
+        </span>
+        
+        {% if articles.has_next %}
+        <a href="?page={{ articles.next_page_number }}" class="pagination__link">Suivant →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+function applyFilters() {
+    const category = document.getElementById('category-filter').value;
+    const author = document.getElementById('author-filter').value;
+    const params = new URLSearchParams();
+    
+    if (category) params.set('categorie', category);
+    if (author) params.set('auteur', author);
+    
+    window.location.search = params.toString();
+}
+</script>
+{% endblock %}
+{% endblock %}

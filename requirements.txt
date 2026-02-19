@@ -31,3 +31,4 @@ tzdata==2025.3
 urllib3==2.6.3
 wagtail==7.2.1
 Willow==1.12.0
+html2text==2024.2.26
