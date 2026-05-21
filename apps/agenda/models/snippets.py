@@ -19,21 +19,35 @@ from wagtail.snippets.models import register_snippet
 class Bidul(models.Model):
     """
     Données métier d'un numéro du Bidul.
-    
+
     Séparé de BidulPage pour :
     - Import Bidul Indexer indépendant du CMS
     - Référence stable pour les Evenements
     - API données sans exposer le contenu éditorial
     """
 
+    class Mois(models.IntegerChoices):
+        JANVIER = 1, "janvier"
+        FEVRIER = 2, "février"
+        MARS = 3, "mars"
+        AVRIL = 4, "avril"
+        MAI = 5, "mai"
+        JUIN = 6, "juin"
+        JUILLET = 7, "juillet"
+        AOUT = 8, "août"
+        SEPTEMBRE = 9, "septembre"
+        OCTOBRE = 10, "octobre"
+        NOVEMBRE = 11, "novembre"
+        DECEMBRE = 12, "décembre"
+
     # Identification
     numero = models.PositiveIntegerField(
         unique=True,
         help_text="Numéro unique du Bidul"
     )
-    mois = models.CharField(
-        max_length=20,
-        help_text="Nom du mois (ex: décembre)"
+    mois = models.PositiveSmallIntegerField(
+        choices=Mois.choices,
+        help_text="Mois de parution (1-12)",
     )
     annee = models.PositiveIntegerField()
     date_publication = models.DateField()
@@ -80,7 +94,12 @@ class Bidul(models.Model):
         ordering = ["-numero"]
 
     def __str__(self):
-        return f"Bidul #{self.numero} - {self.mois} {self.annee}"
+        return f"Bidul #{self.numero} - {self.mois_nom} {self.annee}"
+
+    @property
+    def mois_nom(self):
+        """Nom du mois en français (ex: 'décembre')."""
+        return self.get_mois_display()
 
     @property
     def has_page(self):
@@ -199,6 +218,7 @@ class Lieu(models.Model):
         indexes = [
             models.Index(fields=["ville"]),
             models.Index(fields=["actif", "ville"]),
+            models.Index(fields=["latitude", "longitude"]),
         ]
 
     def __str__(self):

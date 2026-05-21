@@ -198,7 +198,7 @@ class BidulPage(Page):
             return (
                 site.id,
                 site.root_url,
-                f"/le-bidul-de-{self.bidul.mois}-{self.bidul.annee}-{self.bidul.numero}/",
+                f"/le-bidul-de-{self.bidul.mois_nom}-{self.bidul.annee}-{self.bidul.numero}/",
             )
         return None
     
@@ -209,6 +209,10 @@ class BidulPage(Page):
     @property
     def mois(self):
         return self.bidul.mois
+
+    @property
+    def mois_nom(self):
+        return self.bidul.mois_nom
     
     @property
     def annee(self):
