@@ -3,11 +3,11 @@ name = "lebidul"
 version = "0.1.0"
 description = "Site web Le Bidul - Agenda culturel Le Mans"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     # Django & Wagtail
-    "django>=5.1,<5.2",
-    "wagtail>=6.3,<7.0",
+    "django>=6.0,<6.1",
+    "wagtail>=7.2,<8.0",
     
     # Base de données
     "psycopg[binary]>=3.1",
@@ -44,7 +44,7 @@ dev = [
 
 [tool.black]
 line-length = 100
-target-version = ['py311']
+target-version = ['py312']
 exclude = '''
 /(
     \.git
@@ -56,7 +56,7 @@ exclude = '''
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 exclude = ["migrations", ".venv"]
 
 [tool.ruff.lint]

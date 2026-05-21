@@ -20,12 +20,12 @@ install:
 dev: db-start migrate run
 
 db-start:
-	docker-compose up -d
+	docker compose up -d
 	@echo "Attente du démarrage de PostgreSQL..."
 	@sleep 3
 
 db-stop:
-	docker-compose down
+	docker compose down
 
 migrate:
 	python manage.py migrate

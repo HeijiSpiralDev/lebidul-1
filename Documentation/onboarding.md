@@ -26,15 +26,14 @@ Pas de modèle `Artiste` pour l'instant — c'est un report. Voir
 
 ## Pré-requis machine
 
-- **Python 3.11+** (le code marche en 3.11 et 3.12)
+- **Python 3.12+** (Django 6.0 et Wagtail 7.2 l'exigent)
 - **Postgres ≥ 13** — la fonctionnalité `DROP DATABASE … WITH (FORCE)` du
   script de reset l'exige. Utilisateur avec droit `CREATEDB`.
 - **Redis ≥ 7** — utilisé pour le cache Django. Optionnel en dev si on
   désactive le cache à la main.
 - **Git**
-- **(Optionnel) Docker + docker-compose** — référencé par le `Makefile`,
-  mais `docker-compose.yml` n'est pas (encore) commité. À installer
-  manuellement ou monter ses services à la main.
+- **Docker + Docker Compose** — recommandé, le `docker-compose.yml` du
+  repo monte Postgres 16 + Redis 7 d'un coup.
 
 ## Installation
 
@@ -52,31 +51,29 @@ pip install -e ".[dev]"
 
 ### 2. Configurer l'environnement
 
-Le fichier `.env.example` n'existe pas encore. Crée un `.env` à la racine
-avec au minimum :
-
-```env
-DJANGO_SECRET_KEY=dev-secret-change-me
-DJANGO_DEBUG=True
-DJANGO_SETTINGS_MODULE=lebidul.settings.dev
-
-DB_NAME=lebidul
-DB_USER=lebidul
-DB_PASSWORD=lebidul
-DB_HOST=localhost
-DB_PORT=5432
-
-REDIS_URL=redis://localhost:6379/0
+```bash
+cp .env.example .env
+# Adapte les valeurs si besoin (par défaut elles collent au docker-compose).
 ```
-
-Adapte selon ton install Postgres locale.
 
 ### 3. Démarrer Postgres et Redis
 
-Si tu as Docker, lance-les comme tu veux (`docker run …` pour postgres:16
-et redis:7). Sinon, installe-les en natif via ton gestionnaire de paquets.
+Le plus simple : Docker.
 
-Vérifie que Postgres répond et que l'utilisateur peut créer une base :
+```bash
+make db-start
+# équivalent : docker compose up -d
+```
+
+Sans Docker, installe Postgres ≥ 13 et Redis ≥ 7 en natif via ton
+gestionnaire de paquets, puis crée la base et l'utilisateur :
+
+```bash
+sudo -u postgres psql -c "CREATE USER lebidul WITH PASSWORD 'lebidul' CREATEDB;"
+sudo -u postgres psql -c "CREATE DATABASE lebidul OWNER lebidul;"
+```
+
+Vérifie que Postgres répond :
 
 ```bash
 psql -h localhost -U lebidul -d postgres -c '\l'
@@ -189,22 +186,15 @@ Schéma de référence (à la racine, pas dans `Documentation/`) :
 
 ## Pièges connus
 
-- **`docker-compose.yml` manquant** mais référencé par le `Makefile` :
-  `make db-start` ne marche pas en l'état. À fixer ou à monter ses services
-  manuellement.
-- **`.env.example` manquant** : créer son `.env` à la main (voir §2).
 - **Postgres droits** : l'utilisateur configuré dans `.env` doit pouvoir
-  créer des bases (sinon `reset_and_import` échoue). Sur une install neuve,
-  `ALTER USER lebidul CREATEDB;` depuis `psql` en tant que postgres.
+  créer des bases (sinon `reset_and_import` échoue). Avec le
+  `docker-compose.yml` du repo c'est déjà le cas. Sur une install Postgres
+  native : `ALTER USER lebidul CREATEDB;` depuis `psql` en tant que postgres.
 - **HomePage Wagtail** : après `migrate`, Wagtail crée une page d'accueil
   par défaut `slug='home'`. `import_from_sql` crée une `HomePage` séparée
   `slug='accueil'`. Si tu n'importes pas WordPress, supprime la page par
   défaut et crée une `HomePage` à la main, sinon le routage public ne
   pointera pas sur la bonne page.
-- **Python 3.11 vs 3.12** : `requirements.txt` épingle Django 6.0 (qui
-  exige 3.12), mais `pyproject.toml` autorise Django 5.1 (qui marche en
-  3.11). Privilégier `pip install -e ".[dev]"` plutôt que
-  `pip install -r requirements.txt`.
 
 ## Où poser des questions
 
