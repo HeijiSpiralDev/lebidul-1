@@ -5,9 +5,6 @@ Django settings for lebidul project - Base configuration.
 import os
 
 from pathlib import Path
-from django.conf import settings
-from django.conf.urls.static import static
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,7 +24,7 @@ INSTALLED_APPS = [
     "apps.content",
     "apps.theme",
     "apps.migration",
-    
+
     # Wagtail
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -41,13 +38,13 @@ INSTALLED_APPS = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail",
-    
+
     # Third party
     "modelcluster",
     "taggit",
     "rest_framework",
     "django_filters",
-    
+
     # Django
     "django.contrib.admin",
     "django.contrib.auth",
@@ -55,7 +52,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.postgres",
 ]
 
 MIDDLEWARE = [
@@ -92,23 +88,18 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "lebidul.wsgi.application"
 
-# Database
+# Database - SQLite pour le développement local
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "lebidul"),
-        "USER": os.getenv("DB_USER", "lebidul"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "lebidul"),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
 # Cache
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
 }
 
@@ -145,7 +136,7 @@ WAGTAIL_SITE_NAME = "Le Bidul"
 WAGTAILADMIN_BASE_URL = os.getenv("WAGTAILADMIN_BASE_URL", "http://localhost:8000")
 
 # Branding
-WAGTAIL_ADMIN_LOGO = "images/logo-bidul-admin.png"  # Mettre le logo dans static/images/
+WAGTAIL_ADMIN_LOGO = "images/logo-bidul-admin.png"
 
 WAGTAIL_I18N_ENABLED = False
 
@@ -196,14 +187,6 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
 }
-
-# Celery
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = TIME_ZONE
 
 # Taggit
 TAGGIT_CASE_INSENSITIVE = True

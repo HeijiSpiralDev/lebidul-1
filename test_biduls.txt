@@ -1,0 +1,32 @@
+﻿        # === BIDULS ===
+        self.stdout.write("\n📕 Import des BIDULS...")
+        try:
+            cursor.execute("SELECT * FROM bidul ORDER BY numero DESC")
+            bidul_count = 0
+            for row in cursor.fetchall():
+                numero = row[0]
+                mois = row[1]
+                annee = row[2]
+                
+                try:
+                    from datetime import date as date_class
+                    date_pub = date_class(year=annee or 2000, month=mois or 1, day=1)
+                except:
+                    from datetime import date as date_class
+                    date_pub = date_class(year=2000, month=1, day=1)
+                
+                bidul, created = Bidul.objects.get_or_create(
+                    numero=numero,
+                    defaults={
+                        "mois": mois or 0,
+                        "annee": annee or 0,
+                        "date_publication": date_pub,
+                        "nb_evenements": 0,
+                        "data_indexer": {"source": "bidul_archives", "numero": numero},
+                    }
+                )
+                if created:
+                    bidul_count += 1
+            self.stdout.write(self.style.SUCCESS(f"  ✅ {bidul_count} Biduls créés"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"  ❌ Erreur Biduls: {str(e)}"))
