@@ -1,0 +1,43 @@
+{% load static wagtailcore_tags wagtailimages_tags %}
+
+<header class="site-header">
+    <div class="container">
+        {# Logo #}
+        <a href="/" class="site-logo">
+            {% if theme.logo %}
+                {% image theme.logo height-60 as logo_img %}
+                <img src="{{ logo_img.url }}" alt="Le Bidul">
+            {% else %}
+                <span class="site-logo__text">Le Bidul</span>
+            {% endif %}
+        </a>
+        
+        {# Navigation mobile toggle #}
+        <button class="nav-toggle" aria-label="Menu" aria-expanded="false">
+            <span class="nav-toggle__bar"></span>
+            <span class="nav-toggle__bar"></span>
+            <span class="nav-toggle__bar"></span>
+        </button>
+        
+        {# Navigation principale #}
+        <nav class="main-nav" role="navigation">
+            <ul class="main-nav__list">
+                <li class="main-nav__item">
+                    <a href="/" class="main-nav__link">Accueil</a>
+                </li>
+                <li class="main-nav__item">
+                    <a href="/biduls/" class="main-nav__link">Les Biduls</a>
+                </li>
+                <li class="main-nav__item">
+                    <a href="/agenda/" class="main-nav__link">Agenda</a>
+                </li>
+                <li class="main-nav__item">
+                    <a href="/lieux/" class="main-nav__link">Lieux</a>
+                </li>
+                <li class="main-nav__item">
+                    <a href="/chroniques/" class="main-nav__link">Chroniques</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</header>

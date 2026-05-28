@@ -1,132 +1,122 @@
-{% extends "base.html" %}
-{% load wagtailcore_tags wagtailimages_tags %}
-
-{% block body_class %}home{% endblock %}
-
+﻿{% extends "base.html" %}
+{% load static wagtailcore_tags wagtailimages_tags %}
+{% block meta_description %}L'agenda culturel du Mans — Concerts, spectacles, expos et sorties dans la Sarthe.{% endblock %}
+{% block body_class %}home-page{% endblock %}
 {% block content %}
-{# Hero section #}
+
 <section class="hero">
-    {% if page.hero_image %}
-        {% image page.hero_image fill-1920x600 as hero_bg %}
-        <div class="hero__background" style="background-image: url('{{ hero_bg.url }}');"></div>
-    {% endif %}
-    <div class="container hero__content">
-        <h1 class="hero__title">Le Bidul</h1>
-        <p class="hero__subtitle">L'agenda culturel du Mans</p>
-        {% if page.introduction %}
-            <p class="hero__intro">{{ page.introduction }}</p>
-        {% endif %}
-        <a href="/agenda/" class="btn btn--primary">Voir l'agenda</a>
+  {% if page.hero_image %}
+    {% image page.hero_image fill-1920x900 as hero_img %}
+    <div class="hero__bg" style="background-image: url({{ hero_img.url }})"></div>
+  {% endif %}
+  <div class="hero__overlay"></div>
+  <div class="container">
+    <div class="hero__content">
+      <div class="hero__label">L'agenda culturel du Mans</div>
+      <h1 class="hero__title">Le Mans<br><em>vibre</em> culturel.</h1>
+      <p class="hero__subtitle">Concerts, spectacles, expos, sorties…<br>Toute la culture dans la Sarthe.</p>
+      <div class="hero__actions">
+        <a href="/agenda/" class="btn btn-primary">Explorer l'agenda</a>
+        <a href="/biduls/" class="btn btn-white">&#9654; Découvrir Le Bidul</a>
+      </div>
     </div>
+  </div>
+  <div class="hero__scroll"><span>Scroll</span><span>↓</span></div>
 </section>
 
-{# Prochains événements #}
-{% if prochains_evenements %}
-<section class="section section--events">
-    <div class="container">
-        <h2 class="section__title">Prochains événements</h2>
-        <div class="events-grid">
-            {% for event in prochains_evenements %}
-            <article class="event-card">
-                <div class="event-card__date">
-                    <span class="event-card__day">{{ event.date_debut|date:"d" }}</span>
-                    <span class="event-card__month">{{ event.date_debut|date:"M" }}</span>
-                </div>
-                <div class="event-card__content">
-                    <h3 class="event-card__title">{{ event.titre }}</h3>
-                    <p class="event-card__lieu">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                            <circle cx="12" cy="10" r="3"></circle>
-                        </svg>
-                        {{ event.lieu.nom }}
-                    </p>
-                    {% if event.heure_debut %}
-                    <p class="event-card__time">{{ event.heure_debut|time:"H:i" }}</p>
-                    {% endif %}
-                </div>
-                {% if event.categorie %}
-                <span class="event-card__category" style="background-color: {{ event.categorie.couleur }};">
-                    {{ event.categorie.nom }}
-                </span>
-                {% endif %}
-            </article>
-            {% endfor %}
-        </div>
-        <div class="section__footer">
-            <a href="/agenda/" class="btn btn--outline">Voir tout l'agenda</a>
-        </div>
-    </div>
-</section>
-{% endif %}
-
-{# Derniers Biduls #}
 {% if derniers_biduls %}
-<section class="section section--biduls">
-    <div class="container">
-        <h2 class="section__title">Derniers numéros</h2>
-        <div class="biduls-grid">
-            {% for bidul_page in derniers_biduls %}
-            <article class="bidul-card">
-                <a href="{{ bidul_page.url }}">
-                    {% if bidul_page.couverture %}
-                        {% image bidul_page.couverture fill-250x350 as cover %}
-                        <img src="{{ cover.url }}" alt="Bidul n°{{ bidul_page.bidul.numero }}" class="bidul-card__cover">
-                    {% else %}
-                        <div class="bidul-card__cover bidul-card__cover--placeholder">
-                            <span>N°{{ bidul_page.bidul.numero }}</span>
-                        </div>
-                    {% endif %}
-                </a>
-                <h3 class="bidul-card__title">
-                    <a href="{{ bidul_page.url }}">
-                        {{ bidul_page.bidul.mois|capfirst }} {{ bidul_page.bidul.annee }}
-                    </a>
-                </h3>
-                <p class="bidul-card__numero">N°{{ bidul_page.bidul.numero }}</p>
-            </article>
-            {% endfor %}
-        </div>
-        <div class="section__footer">
-            <a href="/biduls/" class="btn btn--outline">Tous les numéros</a>
-        </div>
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div class="section-eyebrow">À la une</div>
+        <h2 class="section-title">Derniers numéros</h2>
+      </div>
+      <a href="/biduls/" class="section-link">Tous les numéros →</a>
     </div>
+    <div class="biduls-grid">
+      {% for bidul_page in derniers_biduls %}
+      <div class="bidul-card">
+        {% if bidul_page.couverture %}
+          {% image bidul_page.couverture fill-300x400 as cover_img %}
+          <div class="bidul-card__cover" style="background-image: url({{ cover_img.url }})"></div>
+        {% endif %}
+        <div class="bidul-card__overlay"></div>
+        <div class="bidul-card__label">Le Bidul</div>
+        <div class="bidul-card__info">
+          <div class="bidul-card__numero">N°{{ bidul_page.bidul.numero }}</div>
+          <div class="bidul-card__date">{{ bidul_page.bidul.date_publication|date:"F Y"|title }}</div>
+        </div>
+        <a href="{{ bidul_page.url }}" class="bidul-card__link"></a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 </section>
 {% endif %}
 
-{# Articles mis en avant #}
-{% if articles_une %}
-<section class="section section--articles">
-    <div class="container">
-        <h2 class="section__title">À la une</h2>
-        <div class="articles-grid">
-            {% for article in articles_une %}
-            <article class="article-card">
-                {% if article.image_principale %}
-                    {% image article.image_principale fill-400x250 as article_img %}
-                    <a href="{{ article.url }}" class="article-card__image">
-                        <img src="{{ article_img.url }}" alt="{{ article.title }}">
-                    </a>
-                {% endif %}
-                <div class="article-card__content">
-                    <h3 class="article-card__title">
-                        <a href="{{ article.url }}">{{ article.title }}</a>
-                    </h3>
-                    {% if article.introduction %}
-                    <p class="article-card__excerpt">{{ article.introduction|truncatewords:20 }}</p>
-                    {% endif %}
-                    <p class="article-card__meta">
-                        {% if article.auteur %}Par {{ article.auteur.nom }} · {% endif %}
-                        {{ article.date_publication|date:"d F Y" }}
-                    </p>
-                </div>
-            </article>
-            {% endfor %}
-        </div>
-        <div class="section__footer">
-            <a href="/chroniques/" class="btn btn--outline">Toutes les chroniques</a>
-        </div>
+{% if prochains_evenements %}
+<section class="section section--alt">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div class="section-eyebrow">À ne pas manquer</div>
+        <h2 class="section-title">Agenda</h2>
+      </div>
+      <a href="/agenda/" class="section-link">Voir tout l'agenda →</a>
     </div>
+    <div class="agenda-grid">
+      {% for evt in prochains_evenements %}
+      <div class="evt-card">
+        <div class="evt-card__visual evt-card__visual--placeholder">
+          <div class="evt-card__date-badge">
+            <div class="evt-card__date-day">{{ evt.date_debut|date:"j" }}</div>
+            <div class="evt-card__date-month">{{ evt.date_debut|date:"M"|upper }}</div>
+          </div>
+        </div>
+        <div class="evt-card__body">
+          {% if evt.categorie %}<div class="evt-card__category">{{ evt.categorie.nom }}</div>{% endif %}
+          <div class="evt-card__title">{{ evt.titre|truncatechars:60 }}</div>
+          <div class="evt-card__venue">
+            <span class="evt-card__venue-name">{{ evt.lieu.nom }}</span>
+            <span class="evt-card__venue-city">{{ evt.lieu.ville }}</span>
+          </div>
+        </div>
+        <a href="/agenda/" class="evt-card__link"></a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 </section>
 {% endif %}
+
+{% if articles_une %}
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div class="section-eyebrow">Chroniques</div>
+        <h2 class="section-title">À lire</h2>
+      </div>
+      <a href="/chroniques/" class="section-link">Toutes les chroniques →</a>
+    </div>
+    <div class="articles-grid">
+      {% for article in articles_une %}
+      <div class="article-card">
+        <div class="article-card__image"></div>
+        <div class="article-card__body">
+          <div class="article-card__meta">{{ article.date_publication|date:"j F Y" }}</div>
+          <div class="article-card__title">{{ article.title }}</div>
+          {% if article.introduction %}
+            <p class="article-card__intro">{{ article.introduction|truncatechars:120 }}</p>
+          {% endif %}
+        </div>
+        <a href="{{ article.url }}" class="article-card__link"></a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
 {% endblock %}

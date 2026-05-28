@@ -25,3 +25,5 @@ Dump20260209.sql
 # IDEs
 .vscode/
 .idea/
+
+import_data/*.sql
