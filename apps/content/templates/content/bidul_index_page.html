@@ -1,96 +1,92 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load wagtailcore_tags wagtailimages_tags %}
 
-{% block meta_description %}Archives de tous les numéros du Bidul - Agenda culturel du Mans{% endblock %}
-
-{% block body_class %}bidul-index{% endblock %}
-
 {% block content %}
-<div class="container">
-    <header class="page-header">
-        <h1 class="page-header__title">{{ page.title }}</h1>
-        {% if page.introduction %}
-        <p class="page-header__intro">{{ page.introduction }}</p>
-        {% endif %}
-    </header>
-    
-    {# Filtres par année #}
-    <div class="filters">
-        <label for="year-filter">Filtrer par année :</label>
-        <select id="year-filter" onchange="filterByYear(this.value)">
-            <option value="">Toutes les années</option>
-            {% regroup biduls by bidul.annee as biduls_by_year %}
-            {% for year_group in biduls_by_year %}
-            <option value="{{ year_group.grouper }}">{{ year_group.grouper }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    
-    {# Grille des Biduls #}
-    <div class="biduls-grid biduls-grid--large">
-        {% for bidul_page in biduls %}
-        <article class="bidul-card" data-year="{{ bidul_page.bidul.annee }}">
-            <a href="{{ bidul_page.url }}" class="bidul-card__link">
-                {% if bidul_page.couverture %}
-                    {% image bidul_page.couverture fill-300x420 as cover %}
-                    <img src="{{ cover.url }}" alt="Bidul n°{{ bidul_page.bidul.numero }}" class="bidul-card__cover">
-                {% else %}
-                    <div class="bidul-card__cover bidul-card__cover--placeholder">
-                        <span class="bidul-card__placeholder-text">N°{{ bidul_page.bidul.numero }}</span>
-                    </div>
-                {% endif %}
-                
-                <div class="bidul-card__overlay">
-                    <span class="bidul-card__numero">N°{{ bidul_page.bidul.numero }}</span>
-                </div>
-            </a>
-            
-            <div class="bidul-card__info">
-                <h2 class="bidul-card__title">
-                    <a href="{{ bidul_page.url }}">
-                        {{ bidul_page.bidul.mois|capfirst }} {{ bidul_page.bidul.annee }}
-                    </a>
-                </h2>
-                {% if bidul_page.bidul.nb_evenements %}
-                <p class="bidul-card__meta">{{ bidul_page.bidul.nb_evenements }} événements</p>
-                {% endif %}
+<div class="biduls-index">
+
+    <header class="biduls-hero">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/">Accueil</a>
+                <span class="breadcrumb__sep">&rsaquo;</span>
+                <span>Les Biduls</span>
             </div>
-        </article>
-        {% empty %}
-        <p class="no-results">Aucun numéro disponible pour le moment.</p>
-        {% endfor %}
+            <h1 class="biduls-hero__title">Les Biduls</h1>
+            <p class="biduls-hero__sub">Tous les numeros publies depuis fevrier 1997.<br>L agenda culturel du Mans, mois apres mois.</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <nav class="year-pills" id="yearPills">
+            <button class="year-pill year-pill--active" data-year="all">Tous</button>
+            {% regroup biduls by bidul.annee as biduls_by_year %}
+            {% for year_group in biduls_by_year reversed %}
+            <button class="year-pill" data-year="{{ year_group.grouper }}">{{ year_group.grouper }}</button>
+            {% endfor %}
+        </nav>
     </div>
-    
-    {# Pagination #}
-    {% if biduls.has_other_pages %}
-    <nav class="pagination">
-        {% if biduls.has_previous %}
-        <a href="?page={{ biduls.previous_page_number }}" class="pagination__link">← Précédent</a>
-        {% endif %}
-        
-        <span class="pagination__current">
-            Page {{ biduls.number }} sur {{ biduls.paginator.num_pages }}
-        </span>
-        
-        {% if biduls.has_next %}
-        <a href="?page={{ biduls.next_page_number }}" class="pagination__link">Suivant →</a>
-        {% endif %}
-    </nav>
-    {% endif %}
+
+    <div class="container">
+        <div class="biduls-gallery" id="bidulsGallery">
+            {% for bidul_page in biduls %}
+            <article class="bcard" data-year="{{ bidul_page.bidul.annee }}">
+                <a href="{% pageurl bidul_page %}" class="bcard__link">
+                    <div class="bcard__cover">
+                        {% if bidul_page.couverture %}
+                            {% image bidul_page.couverture fill-400x560 as couv %}
+                            <img src="{{ couv.url }}" alt="Bidul n{{ bidul_page.bidul.numero }}" loading="lazy">
+                        {% else %}
+                            <div class="bcard__placeholder">
+                                <span class="bcard__placeholder-logo">LE BIDUL</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="bcard__info">
+                        <span class="bcard__num">N{{ bidul_page.bidul.numero }}</span>
+                        <span class="bcard__date">{{ bidul_page.bidul.date_publication|date:"F Y"|title }}</span>
+                    </div>
+                </a>
+            </article>
+            {% empty %}
+            <p class="no-results">Aucun numero pour le moment.</p>
+            {% endfor %}
+        </div>
+    </div>
+
 </div>
 
 {% block extra_js %}
 <script>
-function filterByYear(year) {
-    const cards = document.querySelectorAll('.bidul-card');
-    cards.forEach(card => {
-        if (!year || card.dataset.year === year) {
-            card.style.display = '';
-        } else {
-            card.style.display = 'none';
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    var pills = document.querySelectorAll('.year-pill');
+    var cards = document.querySelectorAll('.bcard');
+    pills.forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            pills.forEach(function(p) { p.classList.remove('year-pill--active'); });
+            this.classList.add('year-pill--active');
+            var year = this.dataset.year;
+            cards.forEach(function(card, i) {
+                if (year === 'all' || card.dataset.year === year) {
+                    card.style.display = '';
+                    card.style.animationDelay = (i % 12) * 0.03 + 's';
+                    card.classList.add('bcard--reveal');
+                } else {
+                    card.style.display = 'none';
+                    card.classList.remove('bcard--reveal');
+                }
+            });
+        });
     });
-}
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+            if (e.isIntersecting) {
+                e.target.classList.add('bcard--reveal');
+                observer.unobserve(e.target);
+            }
+        });
+    }, { threshold: 0.1 });
+    cards.forEach(function(c) { observer.observe(c); });
+});
 </script>
 {% endblock %}
 {% endblock %}
